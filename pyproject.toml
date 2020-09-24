@@ -14,6 +14,7 @@ librosa = ">=0.6.2"
 numpy = ">=1.15.0"
 tqdm = ">=4.28.1"
 mir-eval = {git = "https://github.com/craffel/mir_eval.git"}
+pyfluidsynth = { git = "https://github.com/albedozero/pyfluidsynth.git" }
 mido = ">=1.2.9"
 Pillow = ">=6.2.0"
 pretty_midi = "^0.2.9"
