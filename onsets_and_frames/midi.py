@@ -1,5 +1,8 @@
 import multiprocessing
+from onsets_and_frames.constants import SAMPLE_RATE
 import sys
+from pathlib import Path
+import soundfile as sf
 
 import mido
 import pretty_midi
@@ -10,45 +13,38 @@ from mir_eval.util import hz_to_midi
 from tqdm import tqdm
 
 
-def parse_midi(path):
+def parse_midi(path, instruments = None):
     """open midi file and return np.array of (onset, offset, note, velocity) rows"""
-    midi = mido.MidiFile(path)
+    mid = pretty_midi.PrettyMIDI(path)
+    if instruments is not None:
+        mid.instruments = [inst for inst in mid.instruments if inst.program in instruments]
 
-    time = 0
-    sustain = False
-    events = []
-    for message in midi:
-        time += message.time
+    data = []
+    for instrument in mid.instruments:
+        for note in instrument.notes:
+            data.append((note.start, note.end, int(note.pitch), int(note.velocity)))
 
-        if message.type == 'control_change' and message.control == 64 and (message.value >= 64) != sustain:
-            # sustain pedal state has just changed
-            sustain = message.value >= 64
-            event_type = 'sustain_on' if sustain else 'sustain_off'
-            event = dict(index=len(events), time=time, type=event_type, note=None, velocity=0)
-            events.append(event)
+    data.sort(key=lambda x: x[0])
+    return np.array(data)
 
-        if 'note' in message.type:
-            # MIDI offsets can be either 'note_off' events or 'note_on' with zero velocity
-            velocity = message.velocity if message.type == 'note_on' else 0
-            event = dict(index=len(events), time=time, type='note', note=message.note, velocity=velocity, sustain=sustain)
-            events.append(event)
 
-    notes = []
-    for i, onset in enumerate(events):
-        if onset['velocity'] == 0:
-            continue
+def synthesize_midi(midi_path: Path, save_path: Path, instruments = None, sample_rate = SAMPLE_RATE, sound_font_path = None):
+    mid = pretty_midi.PrettyMIDI(str(midi_path))
+    prev_instruments = list(mid.instruments)
+    if instruments is not None:
+        mid.instruments = [inst for inst in mid.instruments if inst.program in instruments]
 
-        # find the next note_off message
-        offset = next(n for n in events[i + 1:] if n['note'] == onset['note'] or n is events[-1])
-
-        if offset['sustain'] and offset is not events[-1]:
-            # if the sustain pedal is active at offset, find when the sustain ends
-            offset = next(n for n in events[offset['index'] + 1:] if n['type'] == 'sustain_off' or n is events[-1])
-
-        note = (onset['time'], offset['time'], onset['note'], onset['velocity'])
-        notes.append(note)
-
-    return np.array(notes)
+    if len(mid.instruments) == 0:
+        print(f"All instuments in this track are removed! (There were {len(prev_instruments)} instruments)")
+         
+        # If track is empty the flac file will be corrupt
+        # This hack synthesizes the whole midi file and converts the data to a zeros (silent)
+        mid.instruments = prev_instruments
+        synthesized_np = np.zeros(mid.synthesize(fs=sample_rate).shape)
+    else:
+        synthesized_np = mid.fluidsynth(fs=sample_rate, sf2_path=sound_font_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(save_path, synthesized_np, sample_rate)
 
 
 def save_midi(path, pitches, intervals, velocities):

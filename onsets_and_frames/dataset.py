@@ -2,6 +2,7 @@ import json
 import os
 from abc import abstractmethod
 from glob import glob
+from pathlib import Path
 
 import numpy as np
 import soundfile
@@ -9,7 +10,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from .constants import *
-from .midi import parse_midi
+from .midi import parse_midi, synthesize_midi
 
 
 class PianoRollAudioDataset(Dataset):
@@ -181,3 +182,45 @@ class MAPS(PianoRollAudioDataset):
         assert(all(os.path.isfile(tsv) for tsv in tsvs))
 
         return sorted(zip(flacs, tsvs))
+
+
+class LMD_BASS(PianoRollAudioDataset):
+    def __init__(self, path='data/lmd_clean_160', groups=None, sequence_length=None, seed=42, device=DEFAULT_DEVICE):
+        super().__init__(path, groups if groups is not None else ['1', '2'], sequence_length, seed, device)
+        # self.instruments = range(33, 41)
+
+    @classmethod
+    def available_groups(cls):
+        return ['1', '2', '3', '4', '5', '6', '7', '8']
+
+    def files(self, group):
+        instruments = range(33, 41)
+
+        midis = sorted(glob(os.path.join(self.path, 'MIDI', f'{group}*.mid')))
+
+        # If the flacs files does not exist, they will be synthesized by fluidsynth
+        flacs = glob(os.path.join(self.path, 'flac', f'{group}*.flac'))
+
+        for midi in midis:
+            midi_path = Path(midi)
+            if not any((midi_path.stem in flac for flac in flacs)):
+                flac_path = Path(self.path) / 'flac' / (str(midi_path.stem) + '.flac')
+
+                print(f"Synthesizing file {midi_path.name} at {str(flac_path)}")
+                synthesize_midi(midi_path, flac_path, instruments=instruments, sample_rate=SAMPLE_RATE, sound_font_path=None) # TODO: Use different sound fonts
+                flacs.append(str(flac_path))
+
+        assert len(flacs) == len(midis)
+        flacs = sorted(flacs)
+        files = list(zip(flacs, midis))
+        if len(files) == 0:
+            raise RuntimeError(f'Group {group} is empty')
+
+        result = []
+        for audio_path, midi_path in files:
+            tsv_filename = midi_path.replace('.midi', '.tsv').replace('.mid', '.tsv')
+            if not os.path.exists(tsv_filename):
+                midi = parse_midi(midi_path, instruments)
+                np.savetxt(tsv_filename, midi, fmt='%.6f', delimiter='\t', header='onset,offset,note,velocity')
+            result.append((audio_path, tsv_filename))
+        return result

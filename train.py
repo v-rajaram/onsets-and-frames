@@ -1,3 +1,4 @@
+from onsets_and_frames.dataset import LMD_BASS
 import os
 from datetime import datetime
 
@@ -24,7 +25,7 @@ def config():
     iterations = 500000
     resume_iteration = None
     checkpoint_interval = 1000
-    train_on = 'MAESTRO'
+    train_on = 'LMD_BASS'
 
     batch_size = 8
     sequence_length = 327680
@@ -68,9 +69,15 @@ def train(logdir, device, iterations, resume_iteration, checkpoint_interval, tra
     if train_on == 'MAESTRO':
         dataset = MAESTRO(groups=train_groups, sequence_length=sequence_length)
         validation_dataset = MAESTRO(groups=validation_groups, sequence_length=sequence_length)
-    else:
+    elif train_on == "MAPS":
         dataset = MAPS(groups=['AkPnBcht', 'AkPnBsdf', 'AkPnCGdD', 'AkPnStgb', 'SptkBGAm', 'SptkBGCl', 'StbgTGd2'], sequence_length=sequence_length)
         validation_dataset = MAPS(groups=['ENSTDkAm', 'ENSTDkCl'], sequence_length=validation_length)
+    elif train_on == "LMD_BASS":
+        dataset = LMD_BASS(groups=['1', '2', '3', '4', '5', '6'], sequence_length=sequence_length)
+        validation_dataset = LMD_BASS(groups=['7', '8'], sequence_length=validation_length)
+    else:
+        RuntimeError(f"Unsupported train_on: {train_on}")
+
 
     loader = DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
 
