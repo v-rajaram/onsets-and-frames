@@ -3,6 +3,7 @@ import os
 from abc import abstractmethod
 from glob import glob
 from pathlib import Path
+from random import choice
 
 import numpy as np
 import soundfile
@@ -196,6 +197,15 @@ class LMD_BASS(PianoRollAudioDataset):
     def files(self, group):
         instruments = range(32, 40) # look at: https://github.com/craffel/pretty-midi/blob/master/pretty_midi/constants.py
 
+        types = ('*.sf2', '*.sf3') # the tuple of file types
+        soundfonts = []
+        for files in types:
+            soundfonts.extend(glob(os.path.join('data', 'soundfonts', files)))
+        soundfonts = [str(Path(p).absolute()) for p in soundfonts]
+        if len(soundfonts) == 0:
+            print(f"Found no soundfonts at data/sounfonts")
+            print(f"Have you runned 'download_soundfonts.py' first?")
+
         midis = sorted(glob(os.path.join(self.path, 'MIDI', f'{group}*.mid')))
 
         # If the flacs files does not exist, they will be synthesized by fluidsynth
@@ -207,7 +217,7 @@ class LMD_BASS(PianoRollAudioDataset):
                 flac_path = Path(self.path) / 'flac' / (str(midi_path.stem) + '.flac')
 
                 print(f"Synthesizing file {midi_path.name} at {str(flac_path)}")
-                synthesize_midi(midi_path, flac_path, instruments=instruments, sample_rate=SAMPLE_RATE, sound_font_path=None) # TODO: Use different sound fonts
+                synthesize_midi(midi_path, flac_path, instruments=None, sample_rate=SAMPLE_RATE, soundfont_path=choice(soundfonts))
                 flacs.append(str(flac_path))
 
         assert len(flacs) == len(midis)

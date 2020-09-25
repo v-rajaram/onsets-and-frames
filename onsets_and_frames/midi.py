@@ -28,7 +28,7 @@ def parse_midi(path, instruments = None):
     return np.array(data)
 
 
-def synthesize_midi(midi_path: Path, save_path: Path, instruments = None, sample_rate = SAMPLE_RATE, sound_font_path = None):
+def synthesize_midi(midi_path: Path, save_path: Path, instruments = None, sample_rate = SAMPLE_RATE, soundfont_path = None):
     mid = pretty_midi.PrettyMIDI(str(midi_path))
     prev_instruments = list(mid.instruments)
     if instruments is not None:
@@ -42,7 +42,7 @@ def synthesize_midi(midi_path: Path, save_path: Path, instruments = None, sample
         mid.instruments = prev_instruments
         synthesized_np = np.zeros(mid.synthesize(fs=sample_rate).shape)
     else:
-        synthesized_np = mid.fluidsynth(fs=sample_rate, sf2_path=sound_font_path)
+        synthesized_np = mid.fluidsynth(fs=sample_rate, sf2_path=soundfont_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
     sf.write(save_path, synthesized_np, sample_rate)
 
