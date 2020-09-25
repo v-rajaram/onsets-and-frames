@@ -26,6 +26,7 @@ def config():
     resume_iteration = None
     checkpoint_interval = 1000
     train_on = 'LMD_BASS'
+    path = None
 
     batch_size = 8
     sequence_length = 327680
@@ -51,7 +52,7 @@ def config():
 
 
 @ex.automain
-def train(logdir, device, iterations, resume_iteration, checkpoint_interval, train_on, batch_size, sequence_length,
+def train(logdir, device, iterations, resume_iteration, checkpoint_interval, train_on, path, batch_size, sequence_length,
           model_complexity, learning_rate, learning_rate_decay_steps, learning_rate_decay_rate, leave_one_out,
           clip_gradient_norm, validation_length, validation_interval):
     print_config(ex.current_run)
@@ -73,7 +74,7 @@ def train(logdir, device, iterations, resume_iteration, checkpoint_interval, tra
         dataset = MAPS(groups=['AkPnBcht', 'AkPnBsdf', 'AkPnCGdD', 'AkPnStgb', 'SptkBGAm', 'SptkBGCl', 'StbgTGd2'], sequence_length=sequence_length)
         validation_dataset = MAPS(groups=['ENSTDkAm', 'ENSTDkCl'], sequence_length=validation_length)
     elif train_on == "LMD_BASS":
-        dataset = LMD_BASS(groups=['1', '2', '3', '4', '5', '6'], sequence_length=sequence_length)
+        dataset = LMD_BASS(path=path, groups=['1', '2', '3', '4', '5', '6'], sequence_length=sequence_length)
         validation_dataset = LMD_BASS(groups=['7', '8'], sequence_length=validation_length)
     else:
         RuntimeError(f"Unsupported train_on: {train_on}")
