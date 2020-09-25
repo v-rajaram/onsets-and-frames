@@ -194,7 +194,7 @@ class LMD_BASS(PianoRollAudioDataset):
         return ['1', '2', '3', '4', '5', '6', '7', '8']
 
     def files(self, group):
-        instruments = range(33, 41)
+        instruments = range(32, 40) # look at: https://github.com/craffel/pretty-midi/blob/master/pretty_midi/constants.py
 
         midis = sorted(glob(os.path.join(self.path, 'MIDI', f'{group}*.mid')))
 
