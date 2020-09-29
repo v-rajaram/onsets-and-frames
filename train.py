@@ -27,6 +27,7 @@ def config():
     checkpoint_interval = 1000
     train_on = 'LMD_BASS'
     path = None
+    instruments = None # Supported: 'bass', 'drums', None
 
     batch_size = 8
     sequence_length = 327680
@@ -52,7 +53,7 @@ def config():
 
 
 @ex.automain
-def train(logdir, device, iterations, resume_iteration, checkpoint_interval, train_on, path, batch_size, sequence_length,
+def train(logdir, device, iterations, resume_iteration, checkpoint_interval, train_on, path, instruments, batch_size, sequence_length,
           model_complexity, learning_rate, learning_rate_decay_steps, learning_rate_decay_rate, leave_one_out,
           clip_gradient_norm, validation_length, validation_interval):
     print_config(ex.current_run)
@@ -74,8 +75,12 @@ def train(logdir, device, iterations, resume_iteration, checkpoint_interval, tra
         dataset = MAPS(groups=['AkPnBcht', 'AkPnBsdf', 'AkPnCGdD', 'AkPnStgb', 'SptkBGAm', 'SptkBGCl', 'StbgTGd2'], sequence_length=sequence_length)
         validation_dataset = MAPS(groups=['ENSTDkAm', 'ENSTDkCl'], sequence_length=validation_length)
     elif train_on == "LMD_BASS":
-        dataset = LMD_BASS(path=path, groups=['1', '2', '3', '4', '5', '6'], sequence_length=sequence_length)
-        validation_dataset = LMD_BASS(groups=['7', '8'], sequence_length=validation_length)
+        data_groups = [f'{inst}_{i+1}' for i in range(6) for inst in ['all', instruments]]
+        dataset = LMD_BASS(path=path, groups=data_groups, sequence_length=sequence_length, instruments=instruments)
+        validation_datasets = {
+            'all': LMD_BASS(path=path, groups=['all_7', 'all_8'], sequence_length=validation_length, instruments=instruments),
+            'bass': LMD_BASS(path=path, groups=['bass_7', 'bass_8'], sequence_length=validation_length, instruments=instruments)
+        }
     else:
         RuntimeError(f"Unsupported train_on: {train_on}")
 
@@ -114,8 +119,9 @@ def train(logdir, device, iterations, resume_iteration, checkpoint_interval, tra
         if i % validation_interval == 0:
             model.eval()
             with torch.no_grad():
-                for key, value in evaluate(validation_dataset, model).items():
-                    writer.add_scalar('validation/' + key.replace(' ', '_'), np.mean(value), global_step=i)
+                for validation_dataset_name, validation_dataset in validation_datasets.items():
+                    for key, value in evaluate(validation_dataset, model).items():
+                        writer.add_scalar(f'{validation_dataset_name}/' + key.replace(' ', '_'), np.mean(value), global_step=i)
             model.train()
 
         if i % checkpoint_interval == 0:

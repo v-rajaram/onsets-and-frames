@@ -186,17 +186,16 @@ class MAPS(PianoRollAudioDataset):
 
 
 class LMD_BASS(PianoRollAudioDataset):
-    def __init__(self, path='data/lmd_clean_160', groups=None, sequence_length=None, seed=42, device=DEFAULT_DEVICE):
-        super().__init__(path, groups if groups is not None else ['1', '2'], sequence_length, seed, device)
-        # self.instruments = range(33, 41)
+    def __init__(self, path='data/lmd_clean_160', groups=None, sequence_length=None, seed=42, device=DEFAULT_DEVICE, instruments=None):
+        self.instruments = instruments
+        super().__init__(path, groups if groups is not None else ['all_1', 'all_2'], sequence_length, seed, device)
 
     @classmethod
     def available_groups(cls):
-        return ['1', '2', '3', '4', '5', '6', '7', '8']
+        return ['all_1', 'all_2', 'all_3', 'all_4', 'all_5', 'all_6', 'all_7', 'all_8',
+                'bass_1', 'bass_2', 'bass_3', 'bass_4', 'bass_5', 'bass_6', 'bass_7', 'bass_8']
 
-    def files(self, group):
-        instruments = range(32, 40) # look at: https://github.com/craffel/pretty-midi/blob/master/pretty_midi/constants.py
-
+    def files(self, group)
         types = ('*.sf2', '*.sf3') # the tuple of file types
         soundfonts = []
         for files in types:
@@ -206,18 +205,19 @@ class LMD_BASS(PianoRollAudioDataset):
             print(f"Found no soundfonts at data/sounfonts")
             print(f"Have you runned 'download_soundfonts.py' first?")
 
-        midis = sorted(glob(os.path.join(self.path, 'MIDI', f'{group}*.mid')))
+        group_inst, group_number = group.split('_')
+        midis = sorted(glob(os.path.join(self.path, 'MIDI', f'{group_number}_*.mid')))
 
         # If the flacs files does not exist, they will be synthesized by fluidsynth
-        flacs = glob(os.path.join(self.path, 'flac', f'{group}*.flac'))
+        flacs = glob(os.path.join(self.path, 'flac', group_inst, f'{group_number}_*.flac'))
 
         for midi in midis:
             midi_path = Path(midi)
             if not any((midi_path.stem in flac for flac in flacs)):
-                flac_path = Path(self.path) / 'flac' / (str(midi_path.stem) + '.flac')
+                flac_path = Path(self.path) / 'flac' / group_inst / (str(midi_path.stem) + '.flac')
 
-                print(f"Synthesizing file {midi_path.name} at {str(flac_path)}")
-                synthesize_midi(midi_path, flac_path, instruments=None, sample_rate=SAMPLE_RATE, soundfont_path=choice(soundfonts))
+                print(f"{group}: Synthesizing file {midi_path.name} to be saved at {str(flac_path)}")
+                synthesize_midi(midi_path, flac_path, instruments=group_inst, sample_rate=SAMPLE_RATE, soundfont_path=choice(soundfonts))
                 flacs.append(str(flac_path))
 
         assert len(flacs) == len(midis)
@@ -229,8 +229,10 @@ class LMD_BASS(PianoRollAudioDataset):
         result = []
         for audio_path, midi_path in files:
             tsv_filename = midi_path.replace('.midi', '.tsv').replace('.mid', '.tsv')
+            tsv_filename = Path(*['tsv' if p == 'MIDI' else p for p in Path(tsv_filename).parts])
+            tsv_filename.parent.mkdir(parents=True, exist_ok=True)
             if not os.path.exists(tsv_filename):
-                midi = parse_midi(midi_path, instruments)
+                midi = parse_midi(midi_path, self.instruments)
                 np.savetxt(tsv_filename, midi, fmt='%.6f', delimiter='\t', header='onset,offset,note,velocity')
             result.append((audio_path, tsv_filename))
         return result

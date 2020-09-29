@@ -12,12 +12,17 @@ from joblib import Parallel, delayed
 from mir_eval.util import hz_to_midi
 from tqdm import tqdm
 
+INSTRUMENTS_TO_RANGE = {
+    'all': range(0, 128),
+    'bass': range(32, 40),
+    'drums': range(10, 11)
+}
 
 def parse_midi(path, instruments = None):
     """open midi file and return np.array of (onset, offset, note, velocity) rows"""
     mid = pretty_midi.PrettyMIDI(path)
     if instruments is not None:
-        mid.instruments = [inst for inst in mid.instruments if inst.program in instruments]
+        mid.instruments = [inst for inst in mid.instruments if inst.program in INSTRUMENTS_TO_RANGE[instruments]]
 
     data = []
     for instrument in mid.instruments:
@@ -32,7 +37,7 @@ def synthesize_midi(midi_path: Path, save_path: Path, instruments = None, sample
     mid = pretty_midi.PrettyMIDI(str(midi_path))
     prev_instruments = list(mid.instruments)
     if instruments is not None:
-        mid.instruments = [inst for inst in mid.instruments if inst.program in instruments]
+        mid.instruments = [inst for inst in mid.instruments if inst.program in INSTRUMENTS_TO_RANGE[instruments]]
 
     if len(mid.instruments) == 0:
         print(f"All instuments in this track are removed! (There were {len(prev_instruments)} instruments)")
@@ -47,7 +52,7 @@ def synthesize_midi(midi_path: Path, save_path: Path, instruments = None, sample
     sf.write(save_path, synthesized_np, sample_rate)
 
 
-def save_midi(path, pitches, intervals, velocities):
+def save_midi(path, pitches, intervals, velocities, midi_program=0):
     """
     Save extracted notes as a MIDI file
     Parameters
@@ -58,8 +63,7 @@ def save_midi(path, pitches, intervals, velocities):
     velocities: list of velocity values
     """
     file = pretty_midi.PrettyMIDI()
-    piano_program = pretty_midi.instrument_name_to_program('Acoustic Grand Piano')
-    piano = pretty_midi.Instrument(program=piano_program)
+    instrument = pretty_midi.Instrument(program=midi_program)
 
     # Remove overlapping intervals (end time should be smaller of equal start time of next note on the same pitch)
     intervals_dict = collections.defaultdict(list)
@@ -79,9 +83,9 @@ def save_midi(path, pitches, intervals, velocities):
             pitch = int(round(hz_to_midi(pitches[i])))
             velocity = int(127*min(velocities[i], 1))
             note = pretty_midi.Note(velocity=velocity, pitch=pitch, start=interval[0], end=interval[1])
-            piano.notes.append(note)
+            instrument.notes.append(note)
 
-    file.instruments.append(piano)
+    file.instruments.append(instrument)
     file.write(path)
 
 
