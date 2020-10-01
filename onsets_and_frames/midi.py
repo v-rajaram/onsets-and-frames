@@ -1,4 +1,6 @@
 import multiprocessing
+
+from pretty_midi.pretty_midi import PrettyMIDI
 from onsets_and_frames.constants import SAMPLE_RATE
 import sys
 from pathlib import Path
@@ -15,14 +17,22 @@ from tqdm import tqdm
 INSTRUMENTS_TO_RANGE = {
     'all': range(0, 128),
     'bass': range(32, 40),
-    'drums': range(10, 11)
+    'drums': None
 }
+
+
+def extract_instruments(mid: PrettyMIDI, instruments = None):
+    if instruments == 'drums':
+        return [inst for inst in mid.instruments if inst.is_drum]
+    elif instruments is not None:
+        return [inst for inst in mid.instruments if inst.program in INSTRUMENTS_TO_RANGE[instruments]]
+    return mid.instruments
+
 
 def parse_midi(path, instruments = None):
     """open midi file and return np.array of (onset, offset, note, velocity) rows"""
     mid = pretty_midi.PrettyMIDI(path)
-    if instruments is not None:
-        mid.instruments = [inst for inst in mid.instruments if inst.program in INSTRUMENTS_TO_RANGE[instruments]]
+    mid.instruments = extract_instruments(mid, instruments)
 
     data = []
     for instrument in mid.instruments:
@@ -36,8 +46,7 @@ def parse_midi(path, instruments = None):
 def synthesize_midi(midi_path: Path, save_path: Path, instruments = None, sample_rate = SAMPLE_RATE, soundfont_path = None):
     mid = pretty_midi.PrettyMIDI(str(midi_path))
     prev_instruments = list(mid.instruments)
-    if instruments is not None:
-        mid.instruments = [inst for inst in mid.instruments if inst.program in INSTRUMENTS_TO_RANGE[instruments]]
+    mid.instruments = extract_instruments(mid, instruments)
 
     if len(mid.instruments) == 0:
         print(f"All instuments in this track are removed! (There were {len(prev_instruments)} instruments)")

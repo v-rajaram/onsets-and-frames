@@ -1,4 +1,4 @@
-from onsets_and_frames.dataset import LMD_BASS
+from onsets_and_frames.dataset import LMD
 import os
 from datetime import datetime
 
@@ -25,7 +25,7 @@ def config():
     iterations = 500000
     resume_iteration = None
     checkpoint_interval = 1000
-    train_on = 'LMD_BASS'
+    train_on = 'LMD'
     path = None
     instruments = None # Supported: 'bass', 'drums', None
 
@@ -74,12 +74,14 @@ def train(logdir, device, iterations, resume_iteration, checkpoint_interval, tra
     elif train_on == "MAPS":
         dataset = MAPS(groups=['AkPnBcht', 'AkPnBsdf', 'AkPnCGdD', 'AkPnStgb', 'SptkBGAm', 'SptkBGCl', 'StbgTGd2'], sequence_length=sequence_length)
         validation_dataset = MAPS(groups=['ENSTDkAm', 'ENSTDkCl'], sequence_length=validation_length)
-    elif train_on == "LMD_BASS":
+    elif train_on == "LMD":
         data_groups = [f'{inst}_{i+1}' for i in range(6) for inst in ['all', instruments]]
-        dataset = LMD_BASS(path=path, groups=data_groups, sequence_length=sequence_length, instruments=instruments)
+        dataset = LMD(path=path, groups=data_groups, sequence_length=sequence_length, instruments=instruments)
+        
+
         validation_datasets = {
-            'all': LMD_BASS(path=path, groups=['all_7', 'all_8'], sequence_length=validation_length, instruments=instruments),
-            'bass': LMD_BASS(path=path, groups=['bass_7', 'bass_8'], sequence_length=validation_length, instruments=instruments)
+            'validation_all': LMD(path=path, groups=['all_7', 'all_8'], sequence_length=validation_length, instruments=instruments),
+            f'validation_{instruments}': LMD(path=path, groups=[f'{instruments}_{i}' for i in [7, 8]], sequence_length=validation_length, instruments=instruments)
         }
     else:
         RuntimeError(f"Unsupported train_on: {train_on}")

@@ -185,7 +185,7 @@ class MAPS(PianoRollAudioDataset):
         return sorted(zip(flacs, tsvs))
 
 
-class LMD_BASS(PianoRollAudioDataset):
+class LMD(PianoRollAudioDataset):
     def __init__(self, path='data/lmd_clean_160', groups=None, sequence_length=None, seed=42, device=DEFAULT_DEVICE, instruments=None):
         self.instruments = instruments
         super().__init__(path, groups if groups is not None else ['all_1', 'all_2'], sequence_length, seed, device)
@@ -195,7 +195,7 @@ class LMD_BASS(PianoRollAudioDataset):
         return ['all_1', 'all_2', 'all_3', 'all_4', 'all_5', 'all_6', 'all_7', 'all_8',
                 'bass_1', 'bass_2', 'bass_3', 'bass_4', 'bass_5', 'bass_6', 'bass_7', 'bass_8']
 
-    def files(self, group)
+    def files(self, group):
         types = ('*.sf2', '*.sf3') # the tuple of file types
         soundfonts = []
         for files in types:
