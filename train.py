@@ -1,4 +1,4 @@
-from onsets_and_frames.dataset import LMD
+from onsets_and_frames.dataset import LMD, Slakh
 import os
 from datetime import datetime
 
@@ -83,6 +83,9 @@ def train(logdir, device, iterations, resume_iteration, checkpoint_interval, tra
             'validation_all': LMD(path=path, groups=['all_7', 'all_8'], sequence_length=validation_length, instruments=instruments),
             f'validation_{instruments}': LMD(path=path, groups=[f'{instruments}_{i}' for i in [7, 8]], sequence_length=validation_length, instruments=instruments)
         }
+    elif train_on == "Slakh":
+        dataset = Slakh(path=path, groups=train_groups, sequence_length=sequence_length, instruments=instruments)
+        validation_dataset = Slakh(path=path, groups=validation_groups, sequence_length=sequence_length, instruments=instruments)
     else:
         RuntimeError(f"Unsupported train_on: {train_on}")
 
@@ -121,9 +124,8 @@ def train(logdir, device, iterations, resume_iteration, checkpoint_interval, tra
         if i % validation_interval == 0:
             model.eval()
             with torch.no_grad():
-                for validation_dataset_name, validation_dataset in validation_datasets.items():
-                    for key, value in evaluate(validation_dataset, model).items():
-                        writer.add_scalar(f'{validation_dataset_name}/' + key.replace(' ', '_'), np.mean(value), global_step=i)
+                for key, value in evaluate(validation_dataset, model).items():
+                    writer.add_scalar(f'validation/{train_on}/{instruments}/' + key.replace(' ', '_'), np.mean(value), global_step=i)
             model.train()
 
         if i % checkpoint_interval == 0:

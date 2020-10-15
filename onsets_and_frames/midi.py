@@ -14,31 +14,38 @@ from joblib import Parallel, delayed
 from mir_eval.util import hz_to_midi
 from tqdm import tqdm
 
-INSTRUMENTS_TO_RANGE = {
-    'all': range(0, 128),
-    'bass': range(32, 40),
-    'drums': None
-}
-
 
 def extract_instruments(mid: PrettyMIDI, instruments = None):
+    INSTRUMENTS_TO_RANGE = {
+        'bass': range(32, 40),
+    }
+
     if instruments == 'drums':
         return [inst for inst in mid.instruments if inst.is_drum]
-    elif instruments is not None:
+    elif instruments == 'all':
+        return [inst for inst in mid.instruments if not inst.is_drum]
+    elif instruments in INSTRUMENTS_TO_RANGE:
         return [inst for inst in mid.instruments if inst.program in INSTRUMENTS_TO_RANGE[instruments]]
-    return mid.instruments
+    else:
+        raise RuntimeError(f"Unsupported instument {instruments}")
 
 
-def parse_midi(path, instruments = None):
+def parse_midi(path, instruments = 'all'):
     """open midi file and return np.array of (onset, offset, note, velocity) rows"""
     mid = pretty_midi.PrettyMIDI(path)
     mid.instruments = extract_instruments(mid, instruments)
 
     data = []
+    notes_out_of_range = 0
     for instrument in mid.instruments:
         for note in instrument.notes:
-            data.append((note.start, note.end, int(note.pitch), int(note.velocity)))
-
+            if int(note.pitch) in range(21, 109):
+                data.append((note.start, note.end, int(note.pitch), int(note.velocity)))
+            else:
+                notes_out_of_range += 1
+    if notes_out_of_range > 0:
+        print(f"{notes_out_of_range} notes were out of piano range for file {path}")
+    
     data.sort(key=lambda x: x[0])
     return np.array(data)
 
@@ -61,7 +68,7 @@ def synthesize_midi(midi_path: Path, save_path: Path, instruments = None, sample
     sf.write(save_path, synthesized_np, sample_rate)
 
 
-def save_midi(path, pitches, intervals, velocities, midi_program=0):
+def save_midi(path, pitches, intervals, velocities, midi_program=0, is_drum=False):
     """
     Save extracted notes as a MIDI file
     Parameters
@@ -72,7 +79,7 @@ def save_midi(path, pitches, intervals, velocities, midi_program=0):
     velocities: list of velocity values
     """
     file = pretty_midi.PrettyMIDI()
-    instrument = pretty_midi.Instrument(program=midi_program)
+    instrument = pretty_midi.Instrument(program=midi_program, is_drum=is_drum)
 
     # Remove overlapping intervals (end time should be smaller of equal start time of next note on the same pitch)
     intervals_dict = collections.defaultdict(list)

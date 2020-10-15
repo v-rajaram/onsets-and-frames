@@ -15,12 +15,13 @@ from .midi import parse_midi, synthesize_midi
 
 
 class PianoRollAudioDataset(Dataset):
-    def __init__(self, path, groups=None, sequence_length=None, seed=42, device=DEFAULT_DEVICE):
+    def __init__(self, path, groups=None, sequence_length=None, seed=42, device=DEFAULT_DEVICE, instuments='all'):
         self.path = path
         self.groups = groups if groups is not None else self.available_groups()
         self.sequence_length = sequence_length
         self.device = device
         self.random = np.random.RandomState(seed)
+        self.instuments = instuments
 
         self.data = []
         print(f"Loading {len(groups)} group{'s' if len(groups) > 1 else ''} "
@@ -93,7 +94,9 @@ class PianoRollAudioDataset(Dataset):
             velocity: torch.ByteTensor, shape = [num_steps, midi_bins]
                 a matrix that contains MIDI velocity values at the frame locations
         """
-        saved_data_path = audio_path.replace('.flac', '.pt').replace('.wav', '.pt')
+        tail, head = os.path.split(audio_path)
+        saved_data_path = os.path.join(tail, self.instuments + '_' + head.replace('.flac', '.pt').replace('.wav', '.pt'))
+        print(saved_data_path)
         if os.path.exists(saved_data_path):
             return torch.load(saved_data_path)
 
@@ -233,6 +236,32 @@ class LMD(PianoRollAudioDataset):
             tsv_filename.parent.mkdir(parents=True, exist_ok=True)
             if not os.path.exists(tsv_filename):
                 midi = parse_midi(midi_path, self.instruments)
+                np.savetxt(tsv_filename, midi, fmt='%.6f', delimiter='\t', header='onset,offset,note,velocity')
+            result.append((audio_path, tsv_filename))
+        return result
+
+
+class Slakh(PianoRollAudioDataset):
+    def __init__(self, path='data/slakh2100_flac_16k', groups=None, sequence_length=None, seed=42, device=DEFAULT_DEVICE, instruments='bass'):
+        super().__init__(path, groups if groups is not None else ['train'], sequence_length, seed, device, instruments)
+
+    @classmethod
+    def available_groups(cls):
+        return ['train', 'validation', 'test']
+
+    def files(self, group):
+        flacs = sorted(glob(os.path.join(self.path, group, '*', 'mix.flac')))
+        midis = sorted(glob(os.path.join(self.path, group, '*', 'all_src.mid')))
+        files = list(zip(flacs, midis))
+        if len(files) == 0:
+            raise RuntimeError(f'Group {group} is empty')
+
+        result = []
+        for audio_path, midi_path in files:
+            tail, head = os.path.split(midi_path)
+            tsv_filename = os.path.join(tail, self.instuments + '_' + head.replace('.midi', '.tsv').replace('.mid', '.tsv'))
+            if not os.path.exists(tsv_filename):
+                midi = parse_midi(midi_path, self.instuments)
                 np.savetxt(tsv_filename, midi, fmt='%.6f', delimiter='\t', header='onset,offset,note,velocity')
             result.append((audio_path, tsv_filename))
         return result
