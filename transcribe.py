@@ -61,8 +61,11 @@ def transcribe(model, audio):
     return predictions
 
 
-def transcribe_file(model_file, audio_paths, save_path, midi_program, sequence_length,
+def transcribe_file(model_file, audio_paths, save_path, midi_program, is_drum, sequence_length,
                   onset_threshold, frame_threshold, device):
+
+    if save_path is None:
+        save_path = f"output/{model_file.replace('/', '_')}"
 
     model = torch.load(model_file, map_location=device).eval()
     summary(model)
@@ -83,15 +86,16 @@ def transcribe_file(model_file, audio_paths, save_path, midi_program, sequence_l
         pred_path = os.path.join(save_path, os.path.basename(audio_path) + '.pred.png')
         save_pianoroll(pred_path, predictions['onset'], predictions['frame'])
         midi_path = os.path.join(save_path, os.path.basename(audio_path) + '.pred.mid')
-        save_midi(midi_path, p_est, i_est, v_est, midi_program=midi_program)
+        save_midi(midi_path, p_est, i_est, v_est, midi_program=midi_program, is_drum=is_drum)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('model_file', type=str)
     parser.add_argument('audio_paths', type=str, nargs='+')
-    parser.add_argument('--save-path', type=str, default='.')
+    parser.add_argument('--save-path', type=str, default=None)
     parser.add_argument('--midi-program', default=0, type=int)
+    parser.add_argument('--is_drum', action='store_true')
     parser.add_argument('--sequence-length', default=None, type=int)
     parser.add_argument('--onset-threshold', default=0.5, type=float)
     parser.add_argument('--frame-threshold', default=0.5, type=float)
