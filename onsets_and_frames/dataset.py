@@ -96,7 +96,6 @@ class PianoRollAudioDataset(Dataset):
         """
         tail, head = os.path.split(audio_path)
         saved_data_path = os.path.join(tail, self.instuments + '_' + head.replace('.flac', '.pt').replace('.wav', '.pt'))
-        print(saved_data_path)
         if os.path.exists(saved_data_path):
             return torch.load(saved_data_path)
 
