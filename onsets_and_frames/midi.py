@@ -1,12 +1,12 @@
 import multiprocessing
 
 from pretty_midi.pretty_midi import PrettyMIDI
-from onsets_and_frames.constants import SAMPLE_RATE
+from onsets_and_frames.constants import SAMPLE_RATE, MIN_MIDI, MAX_MIDI
 import sys
 from pathlib import Path
 import soundfile as sf
 
-import mido
+
 import pretty_midi
 import numpy as np
 import collections
@@ -36,15 +36,15 @@ def parse_midi(path, instruments = 'all'):
     mid.instruments = extract_instruments(mid, instruments)
 
     data = []
-    notes_out_of_range = 0
+    notes_out_of_range = set()
     for instrument in mid.instruments:
         for note in instrument.notes:
-            if int(note.pitch) in range(21, 109):
+            if int(note.pitch) in range(MIN_MIDI, MAX_MIDI+1):
                 data.append((note.start, note.end, int(note.pitch), int(note.velocity)))
             else:
-                notes_out_of_range += 1
-    if notes_out_of_range > 0:
-        print(f"{notes_out_of_range} notes were out of piano range for file {path}")
+                notes_out_of_range.add(int(note.pitch))
+    if len(notes_out_of_range) > 0:
+        print(f"{len(notes_out_of_range)} notes out of MIDI range ({MIN_MIDI},{MAX_MIDI}) for file {path}. Excluded pitches: {notes_out_of_range}")
     
     data.sort(key=lambda x: x[0])
     return np.array(data)

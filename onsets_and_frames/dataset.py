@@ -6,9 +6,11 @@ from pathlib import Path
 from random import choice
 
 import numpy as np
-import soundfile
+from torch.functional import norm
 from torch.utils.data import Dataset
 from tqdm import tqdm
+import torchaudio
+torchaudio.set_audio_backend('sox_io')
 
 from .constants import *
 from .midi import parse_midi, synthesize_midi
@@ -94,41 +96,51 @@ class PianoRollAudioDataset(Dataset):
             velocity: torch.ByteTensor, shape = [num_steps, midi_bins]
                 a matrix that contains MIDI velocity values at the frame locations
         """
-        tail, head = os.path.split(audio_path)
-        saved_data_path = os.path.join(tail, self.instuments + '_' + head.replace('.flac', '.pt').replace('.wav', '.pt'))
-        if os.path.exists(saved_data_path):
-            return torch.load(saved_data_path)
+        saved_audio_path = audio_path.replace('.flac', '.wav')
+        saved_label_data_path = tsv_path.replace('.tsv', '.pt')
 
-        audio, sr = soundfile.read(audio_path, dtype='int16')
-        assert sr == SAMPLE_RATE
+        if os.path.exists(saved_audio_path):
+            audio, sample_rate = torchaudio.load(saved_audio_path, normalize=False)
+        else:
+            # Convert flac to wav for faster load times (approx. 8 times faster)
+            audio, sample_rate = torchaudio.load(audio_path, normalize=False)
+            audio = (2**15 * audio).to(torch.int16)
+            torchaudio.save(saved_audio_path, audio, sample_rate)
 
-        audio = torch.ShortTensor(audio)
-        audio_length = len(audio)
+        audio = audio[0]
 
-        n_keys = MAX_MIDI - MIN_MIDI + 1
-        n_steps = (audio_length - 1) // HOP_LENGTH + 1
+        if os.path.exists(saved_label_data_path):
+            label_data = torch.load(saved_label_data_path)
+        else:
+            # audio = torch.ShortTensor(audio)
+            audio_length = len(audio)
 
-        label = torch.zeros(n_steps, n_keys, dtype=torch.uint8)
-        velocity = torch.zeros(n_steps, n_keys, dtype=torch.uint8)
+            n_keys = MAX_MIDI - MIN_MIDI + 1
+            n_steps = (audio_length - 1) // HOP_LENGTH + 1
 
-        tsv_path = tsv_path
-        midi = np.loadtxt(tsv_path, delimiter='\t', skiprows=1)
+            label = torch.zeros(n_steps, n_keys, dtype=torch.uint8)
+            velocity = torch.zeros(n_steps, n_keys, dtype=torch.uint8)
 
-        for onset, offset, note, vel in midi:
-            left = int(round(onset * SAMPLE_RATE / HOP_LENGTH))
-            onset_right = min(n_steps, left + HOPS_IN_ONSET)
-            frame_right = int(round(offset * SAMPLE_RATE / HOP_LENGTH))
-            frame_right = min(n_steps, frame_right)
-            offset_right = min(n_steps, frame_right + HOPS_IN_OFFSET)
+            midi = np.loadtxt(tsv_path, delimiter='\t', skiprows=1)
 
-            f = int(note) - MIN_MIDI
-            label[left:onset_right, f] = 3
-            label[onset_right:frame_right, f] = 2
-            label[frame_right:offset_right, f] = 1
-            velocity[left:frame_right, f] = vel
+            for onset, offset, note, vel in midi:
+                left = int(round(onset * SAMPLE_RATE / HOP_LENGTH))
+                onset_right = min(n_steps, left + HOPS_IN_ONSET)
+                frame_right = int(round(offset * SAMPLE_RATE / HOP_LENGTH))
+                frame_right = min(n_steps, frame_right)
+                offset_right = min(n_steps, frame_right + HOPS_IN_OFFSET)
 
-        data = dict(path=audio_path, audio=audio, label=label, velocity=velocity)
-        torch.save(data, saved_data_path)
+                f = int(note) - MIN_MIDI
+                label[left:onset_right, f] = 3
+                label[onset_right:frame_right, f] = 2
+                label[frame_right:offset_right, f] = 1
+                velocity[left:frame_right, f] = vel
+
+            label_data = dict(path=audio_path, label=label, velocity=velocity)
+            torch.save(label_data, saved_label_data_path)
+
+        data = label_data
+        data['audio'] = audio
         return data
 
 
@@ -258,9 +270,9 @@ class Slakh(PianoRollAudioDataset):
         result = []
         for audio_path, midi_path in files:
             tail, head = os.path.split(midi_path)
-            tsv_filename = os.path.join(tail, self.instuments + '_' + head.replace('.midi', '.tsv').replace('.mid', '.tsv'))
+            tsv_filename = os.path.join(tail, head.replace('.midi', '').replace('.mid', '') + f"_{self.instuments}.tsv")
             if not os.path.exists(tsv_filename):
                 midi = parse_midi(midi_path, self.instuments)
-                np.savetxt(tsv_filename, midi, fmt='%.6f', delimiter='\t', header='onset,offset,note,velocity')
+                np.savetxt(tsv_filename, midi, fmt='%.6f', delimiter='\t', header='onset\toffset\tnote\tvelocity')
             result.append((audio_path, tsv_filename))
         return result
