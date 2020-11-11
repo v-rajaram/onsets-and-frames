@@ -46,9 +46,8 @@ def load_and_process_audio(flac_path, sequence_length, device):
     return audio
 
 
-def transcribe(model, audio):
-
-    mel = melspectrogram(audio.reshape(-1, audio.shape[-1])[:, :-1]).transpose(-1, -2)
+def transcribe(model, audio: torch.Tensor):
+    mel = melspectrogram(audio.unsqueeze_(0)).transpose_(-1, -2)
     onset_pred, offset_pred, _, frame_pred, velocity_pred = model(mel)
 
     predictions = {
