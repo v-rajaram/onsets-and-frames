@@ -1,6 +1,6 @@
 # PyTorch Implementation of Onsets and Frames
 
-This is a [PyTorch](https://pytorch.org/) implementation of Google's [Onsets and Frames](https://magenta.tensorflow.org/onsets-frames) model, using the [Maestro dataset](https://magenta.tensorflow.org/datasets/maestro) for training and the Disklavier portion of the [MAPS database](http://www.tsi.telecom-paristech.fr/aao/en/2010/07/08/maps-database-a-piano-database-for-multipitch-estimation-and-automatic-transcription-of-music/) for testing.
+This project builds off of the modifications to the [PyTorch](https://pytorch.org/) implementation of Google's [Onsets and Frames](https://magenta.tensorflow.org/onsets-frames) model using the [Maestro dataset](https://magenta.tensorflow.org/datasets/maestro) for training and the Disklavier portion of the [MAPS database](http://www.tsi.telecom-paristech.fr/aao/en/2010/07/08/maps-database-a-piano-database-for-multipitch-estimation-and-automatic-transcription-of-music/) for testing. The modifications are made by Henrik Grønbech to the PyTorch model originally created by Jong Wook Kim. The purpose of this project is to attempt to fine-tune the state-of-the-art performance on Automatic Music Transcription achieved by the Onsets and Frames model, specifically focusing on jazz piano. 
 
 ## Instructions
 
